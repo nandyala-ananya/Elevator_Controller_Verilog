@@ -1,0 +1,96 @@
+timescale 1ns/1ps
+
+module elevator_controller_tb;
+
+    // Testbench signals
+    reg clk;
+    reg reset;
+    reg [2:0] btn;
+    reg overload;
+    reg door_sensor;
+
+    wire motor_up;
+    wire motor_down;
+    wire door_open;
+    wire door_close;
+    wire [1:0] current_floor;
+
+    // DUT instantiation (NO extra comma at the end)
+    elevator_controller dut (
+        .clk(clk),
+        .reset(reset),
+        .btn(btn),
+        .overload(overload),
+        .door_sensor(door_sensor),
+        .motor_up(motor_up),
+        .motor_down(motor_down),
+        .door_open(door_open),
+        .door_close(door_close),
+        .current_floor(current_floor)
+    );
+
+    // Clock generation: 10 ns period
+    always #5 clk = ~clk;
+
+    initial begin
+        // -------------------------------
+        // Waveform dump for EPWave
+        // -------------------------------
+        $dumpfile("dump.vcd");
+        $dumpvars(0, elevator_controller_tb);
+
+        // -------------------------------
+        // Initial values
+        // -------------------------------
+        clk = 0;
+        reset = 1;
+        btn = 3'b000;
+        overload = 0;
+        door_sensor = 1;   // door initially closed
+
+        // -------------------------------
+        // Apply reset
+        // -------------------------------
+        #10 reset = 0;
+
+        // -------------------------------
+        // Test case 1: Move from floor 0 to floor 2
+        // -------------------------------
+        #10 btn = 3'b100;   // request floor 2
+        #10 btn = 3'b000;   // release button
+
+        #50;                // wait for movement
+
+        // -------------------------------
+        // Test case 2: Door obstruction
+        // -------------------------------
+        door_sensor = 0;    // door blocked
+        #10;
+        door_sensor = 1;    // door cleared
+
+        #30;
+
+        // -------------------------------
+        // Test case 3: Overload condition
+        // -------------------------------
+        overload = 1;
+        #20;
+        overload = 0;
+
+        #30;
+
+        // -------------------------------
+        // Test case 4: Move from floor 2 to floor 0
+        // -------------------------------
+        btn = 3'b001;       // request floor 0
+        #10 btn = 3'b000;
+
+        #60;
+
+        // -------------------------------
+        // End simulation
+        // -------------------------------
+        $finish;
+    end
+
+endmodule

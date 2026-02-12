@@ -1,0 +1,131 @@
+module elevator_controller (
+    input clk,
+    input reset,
+
+    input [2:0] btn,          // btn[0]=floor0, btn[1]=floor1, btn[2]=floor2
+    input overload,            // 1 = overload
+    input door_sensor,         // 1 = door closed
+
+    output reg motor_up,
+    output reg motor_down,
+    output reg door_open,
+    output reg door_close,
+    output reg [1:0] current_floor
+);
+
+    // -------------------------------------------------
+    // State Declaration
+    // -------------------------------------------------
+    parameter IDLE       = 3'b000;
+    parameter MOVE_UP    = 3'b001;
+    parameter MOVE_DOWN  = 3'b010;
+    parameter DOOR_OPEN  = 3'b011;
+    parameter DOOR_CLOSE = 3'b100;
+
+    reg [2:0] state, next_state;
+    reg [1:0] target_floor;
+
+    // -------------------------------------------------
+    // Button Priority Logic (Combinational)
+    // -------------------------------------------------
+    always @(*) begin
+        if (btn[2])
+            target_floor = 2;
+        else if (btn[1])
+            target_floor = 1;
+        else if (btn[0])
+            target_floor = 0;
+        else
+            target_floor = current_floor;
+    end
+
+    // -------------------------------------------------
+    // State Register (Sequential)
+    // -------------------------------------------------
+    always @(posedge clk or posedge reset) begin
+        if (reset) begin
+            state <= IDLE;
+            current_floor <= 0;
+        end else begin
+            state <= next_state;
+
+            // Simulate floor change
+            if (state == MOVE_UP)
+                current_floor <= current_floor + 1;
+            else if (state == MOVE_DOWN)
+                current_floor <= current_floor - 1;
+        end
+    end
+
+    // -------------------------------------------------
+    // FSM Next State Logic (Combinational)
+    // -------------------------------------------------
+    always @(*) begin
+        // Default outputs
+        motor_up   = 0;
+        motor_down = 0;
+        door_open  = 0;
+        door_close = 0;
+        next_state = state;
+
+        case (state)
+
+            // ---------------- IDLE ----------------
+            IDLE: begin
+                if (overload) begin
+                    next_state = DOOR_OPEN;
+                end
+                else if (btn != 0) begin
+                    if (target_floor > current_floor)
+                        next_state = MOVE_UP;
+                    else if (target_floor < current_floor)
+                        next_state = MOVE_DOWN;
+                    else
+                        next_state = DOOR_OPEN;
+                end
+            end
+
+            // ---------------- MOVE UP ----------------
+            MOVE_UP: begin
+                if (overload || !door_sensor) begin
+                    next_state = DOOR_OPEN;
+                end else begin
+                    motor_up = 1;
+                    if (current_floor == target_floor)
+                        next_state = DOOR_OPEN;
+                end
+            end
+
+            // ---------------- MOVE DOWN ----------------
+            MOVE_DOWN: begin
+                if (overload || !door_sensor) begin
+                    next_state = DOOR_OPEN;
+                end else begin
+                    motor_down = 1;
+                    if (current_floor == target_floor)
+                        next_state = DOOR_OPEN;
+                end
+            end
+
+            // ---------------- DOOR OPEN ----------------
+            DOOR_OPEN: begin
+                door_open = 1;
+                next_state = DOOR_CLOSE;
+            end
+
+            // ---------------- DOOR CLOSE ----------------
+            DOOR_CLOSE: begin
+                door_close = 1;
+                if (door_sensor)
+                    next_state = IDLE;
+                else
+                    next_state = DOOR_OPEN;
+            end
+
+            default: next_state = IDLE;
+
+        endcase
+    end
+
+endmodule
+
